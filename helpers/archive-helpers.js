@@ -1,6 +1,8 @@
 var fs = require('fs');
 var path = require('path');
 var _ = require('underscore');
+var http = require('http');
+var Promise = require('bluebird');
 
 /*
  * You will need to reuse the same paths many times over in the course of this sprint.
@@ -11,7 +13,7 @@ var _ = require('underscore');
 
 var urlStorage = {};
 
-exports.paths = {
+exports.paths = paths = {
   siteAssets: path.join(__dirname, '../web/public'),
   archivedSites: path.join(__dirname, '../archives/sites'),
   list: path.join(__dirname, '../archives/sites.txt')
@@ -27,25 +29,84 @@ exports.initialize = function(pathsObj) {
 // The following function names are provided to you to suggest how you might
 // modularize your code. Keep it clean!
 
-exports.readListOfUrls = function(url) {
-};
-
-exports.isUrlInList = function() {
-  return urlStorage[url] ? true : false;
-};
-
-exports.addUrlToList = function(url) {
-  urlStorage[url] = url;
-  var writePath = path.join(__dirname, '../archives/sites.txt');
-  fs.writeFileSync(writePath, url + '\n', function(err) {
-    if (err) {
-      throw err;
-    }
+exports.readListOfUrls = readListOfUrls = function(callback) {
+  // fs.readFile(paths.list, 'utf8', function(err, data) {
+  //   if (err) {
+  //     throw err;
+  //   } else {
+  //     var urls = data.split('\n');
+  //     callback(urls);
+  //   }
+  // });
+  return new Promise(function(resolve, reject) {
+    fs.readFile(paths.list, 'utf8', function(err, data) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  })
+  .then(function(data) {
+    var urls = data.split('\n');
+    callback(urls);
+  })
+  .catch(function(err) {
+    throw err;
   });
 };
 
-exports.isUrlArchived = function() {
+exports.isUrlInList = isUrlInList = function(url, callback) {
+  readListOfUrls(function(urls) {
+    callback(urls.indexOf(url) !== -1);
+  });
 };
 
-exports.downloadUrls = function() {
+exports.addUrlToList = function(url, callback) {
+  return new Promise(function(resolve, reject) {
+    urlStorage[url] = url;
+    fs.writeFile(paths.list, url + '\n', {flag: 'a'}, function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  })
+  .then(function() {
+    callback();
+  })
+  .catch(function(err) {
+    throw err;
+  });
+};
+
+exports.isUrlArchived = function(url, callback) {
+  var urlPath = path.join(paths.archivedSites, url);
+  fs.exists(urlPath, function(exists) {
+    callback(exists);
+  });
+};
+
+exports.downloadUrls = function(urlsArray) {
+  _.each(urlsArray, function(url) {
+    if (!isUrlInList(url, _.identity)) {
+      http.get('http://' + url, function(response) {
+        var data = '';
+        response.on('data', function(chunk) {
+          data += chunk;
+        });
+        response.on('end', function() {
+          fs.writeFile(paths.archivedSites + '/' + url, data, 'utf8', function(err) {
+            if (err) {
+              console.log(err);
+              throw err;
+            } else {
+              console.log('Successfully saved file');
+            }
+          });
+        });
+      });
+    }
+  });
 };

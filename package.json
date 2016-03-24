@@ -6,6 +6,7 @@
   "dependencies": {
     "bluebird": "^3.0.0",
     "cron": "^1.0.3",
+    "jquery": "^2.2.2",
     "request": "^2.34.0",
     "underscore": "^1.6.0"
   },
