@@ -39,11 +39,15 @@ exports.readListOfUrls = readListOfUrls = function(callback) {
   //   }
   // });
   return new Promise(function(resolve, reject) {
-    fs.readFile(paths.list, 'utf8', function(err, data) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(data);
+    fs.exists(paths.list, function(exists) {
+      if (exists) {
+        fs.readFile(paths.list, 'utf8', function(err, data) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(data);
+          }
+        });
       }
     });
   })
@@ -52,7 +56,7 @@ exports.readListOfUrls = readListOfUrls = function(callback) {
     callback(urls);
   })
   .catch(function(err) {
-    throw err;
+    console.log('Could not read list of urls', err);
   });
 };
 
@@ -77,11 +81,11 @@ exports.addUrlToList = function(url, callback) {
     callback();
   })
   .catch(function(err) {
-    throw err;
+    console.log('Could not add url to list', err);
   });
 };
 
-exports.isUrlArchived = function(url, callback) {
+exports.isUrlArchived = isUrlArchived = function(url, callback) {
   var urlPath = path.join(paths.archivedSites, url);
   fs.exists(urlPath, function(exists) {
     callback(exists);
@@ -90,23 +94,29 @@ exports.isUrlArchived = function(url, callback) {
 
 exports.downloadUrls = function(urlsArray) {
   _.each(urlsArray, function(url) {
-    if (!isUrlInList(url, _.identity)) {
-      http.get('http://' + url, function(response) {
-        var data = '';
-        response.on('data', function(chunk) {
-          data += chunk;
-        });
-        response.on('end', function() {
-          fs.writeFile(paths.archivedSites + '/' + url, data, 'utf8', function(err) {
-            if (err) {
-              console.log(err);
-              throw err;
-            } else {
-              console.log('Successfully saved file');
-            }
+    isUrlArchived(url, function(exists) {
+      if (!exists) {
+        http.get('http://' + url, function(response) {
+          var data = '';
+          response.on('data', function(chunk) {
+            data += chunk;
           });
+          response.on('end', function() {
+            fs.writeFile(paths.archivedSites + '/' + url, data, 'utf8', function(err) {
+              if (err) {
+                console.log(err);
+                throw err;
+              } else {
+                console.log('Successfully saved file');
+              }
+            });
+          });
+        })
+        .on('error', function(err) {
+          console.log('Could not save url ' + url, err);
         });
-      });
-    }
+        
+      }
+    });
   });
 };

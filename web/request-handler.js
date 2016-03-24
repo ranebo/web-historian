@@ -3,12 +3,13 @@ var archive = require('../helpers/archive-helpers');
 var fs = require('fs');
 var path = require('path');
 var httpHelpers = require('./http-helpers');
+var _ = require('underscore');
 // require more modules/folders here!
 
 exports.handleRequest = function (req, res) {
   if (req.method === 'GET') {
     if (req.url === '/') {
-      var url = path.join(__dirname, '/public/index.html');
+      var url = path.join(archive.paths.siteAssets, '/index.html');
     } else {
       var url = path.join(__dirname, '../test/testdata/sites', req.url);
     }
@@ -27,16 +28,48 @@ exports.handleRequest = function (req, res) {
       }
     });
   } else if (req.method === 'POST') {
-    var data = '';
+    var queryData = '';
+    var loadingPath = path.join(archive.paths.siteAssets, '/loading.html');
     req.on('data', function(chunk) {
-      data += chunk;
+      queryData += chunk;
     });
     req.on('end', function() {
-      data = JSON.parse(data);
-      archive.addUrlToList(data.url, function() {
-        res.writeHead(302);
+      queryDataUrl = queryData.slice(4);
+      if (queryData.slice(0, 3) === 'url') {
+        archive.isUrlInList(queryDataUrl, function(exists) {
+          if (!exists) {
+            archive.addUrlToList(queryDataUrl, _.identity);
+            fs.readFile(loadingPath, 'utf8', function(err, data) {
+              if (err) {
+                console.log('Could not load loading.html', err);
+              } else {
+                res.writeHead(302);
+                res.end(data);
+              }
+            });
+          } else {
+            var archivePath = path.join(archive.paths.archivedSites, queryDataUrl);
+            fs.readFile(archivePath, 'utf8', function(err, data) {
+              if (err) {
+                fs.readFile(loadingPath, 'utf8', function(err, data) {
+                  if (err) {
+                    console.log('Could not load loading.html', err);
+                  } else {
+                    res.writeHead(302);
+                    res.end(data);
+                  }
+                });
+              } else {
+                res.writeHead(302);
+                res.end(data);
+              }
+            });
+          }
+        });
+      } else {
+        res.writeHead(404);
         res.end();
-      });
+      }
     });
   }
 
