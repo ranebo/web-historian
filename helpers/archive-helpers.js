@@ -9,6 +9,8 @@ var _ = require('underscore');
  * customize it in any way you wish.
  */
 
+var urlStorage = {};
+
 exports.paths = {
   siteAssets: path.join(__dirname, '../web/public'),
   archivedSites: path.join(__dirname, '../archives/sites'),
@@ -25,13 +27,21 @@ exports.initialize = function(pathsObj) {
 // The following function names are provided to you to suggest how you might
 // modularize your code. Keep it clean!
 
-exports.readListOfUrls = function() {
+exports.readListOfUrls = function(url) {
 };
 
 exports.isUrlInList = function() {
+  return urlStorage[url] ? true : false;
 };
 
-exports.addUrlToList = function() {
+exports.addUrlToList = function(url) {
+  urlStorage[url] = url;
+  var writePath = path.join(__dirname, '../archives/sites.txt');
+  fs.writeFileSync(writePath, url + '\n', function(err) {
+    if (err) {
+      throw err;
+    }
+  });
 };
 
 exports.isUrlArchived = function() {

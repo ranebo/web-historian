@@ -1,6 +1,7 @@
 var path = require('path');
 var fs = require('fs');
 var archive = require('../helpers/archive-helpers');
+var Promise = require('bluebird');
 
 exports.headers = headers = {
   'access-control-allow-origin': '*',
@@ -11,11 +12,21 @@ exports.headers = headers = {
 };
 
 exports.serveAssets = function(res, asset, callback) {
-  // Write some code here that helps serve up your static files!
-  // (Static files are things like html (yours or archived from others...),
-  // css, or anything that doesn't change often.)
+  res.writeHead(200, headers);
+  res.end(callback ? callback(asset) : asset);
 };
 
+readAssets = function(pathname, callback) {
+  return fs.readFile(pathname, 'utf8', function(err, data) {
+    if (err) {
+      throw callback(err);
+    } else {
+      return callback(null, data);
+    }
+  });  
+};
+
+exports.readAssetsAsync = Promise.promisify(readAssets);
 
 
 // As you progress, keep thinking about what helper functions you can put here!
