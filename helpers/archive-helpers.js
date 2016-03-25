@@ -11,8 +11,6 @@ var Promise = require('bluebird');
  * customize it in any way you wish.
  */
 
-var urlStorage = {};
-
 exports.paths = paths = {
   siteAssets: path.join(__dirname, '../web/public'),
   archivedSites: path.join(__dirname, '../archives/sites'),
@@ -29,15 +27,7 @@ exports.initialize = function(pathsObj) {
 // The following function names are provided to you to suggest how you might
 // modularize your code. Keep it clean!
 
-exports.readListOfUrls = readListOfUrls = function(callback) {
-  // fs.readFile(paths.list, 'utf8', function(err, data) {
-  //   if (err) {
-  //     throw err;
-  //   } else {
-  //     var urls = data.split('\n');
-  //     callback(urls);
-  //   }
-  // });
+exports.readListOfUrls = readListOfUrls = function() {
   return new Promise(function(resolve, reject) {
     fs.exists(paths.list, function(exists) {
       if (exists) {
@@ -45,78 +35,70 @@ exports.readListOfUrls = readListOfUrls = function(callback) {
           if (err) {
             reject(err);
           } else {
-            resolve(data);
+            resolve(data.split('\n'));
           }
         });
       }
     });
-  })
-  .then(function(data) {
-    var urls = data.split('\n');
-    callback(urls);
-  })
-  .catch(function(err) {
-    console.log('Could not read list of urls', err);
   });
 };
 
-exports.isUrlInList = isUrlInList = function(url, callback) {
-  readListOfUrls(function(urls) {
-    callback(urls.indexOf(url) !== -1);
-  });
-};
-
-exports.addUrlToList = function(url, callback) {
+exports.isUrlInList = isUrlInList = function(url) {
   return new Promise(function(resolve, reject) {
-    urlStorage[url] = url;
+    readListOfUrls()
+      .then(function(urls) {
+        resolve(urls.indexOf(url) !== -1);
+      })
+      .catch(function(err) {
+        console.log('Could not read list of urls', err);
+      });
+  });
+};
+
+exports.addUrlToList = function(url) {
+  return new Promise(function(resolve, reject) {
     fs.writeFile(paths.list, url + '\n', {flag: 'a'}, function(err) {
       if (err) {
         reject(err);
-      } else {
-        resolve();
       }
     });
-  })
-  .then(function() {
-    callback();
-  })
-  .catch(function(err) {
-    console.log('Could not add url to list', err);
   });
 };
 
-exports.isUrlArchived = isUrlArchived = function(url, callback) {
-  var urlPath = path.join(paths.archivedSites, url);
-  fs.exists(urlPath, function(exists) {
-    callback(exists);
+exports.isUrlArchived = isUrlArchived = function(url) {
+  return new Promise(function(resolve, reject) {
+    var urlPath = path.join(paths.archivedSites, url);
+    fs.exists(urlPath, function(exists) {
+      resolve(exists);
+    });
   });
 };
 
 exports.downloadUrls = function(urlsArray) {
   _.each(urlsArray, function(url) {
-    isUrlArchived(url, function(exists) {
-      if (!exists) {
-        http.get('http://' + url, function(response) {
-          var data = '';
-          response.on('data', function(chunk) {
-            data += chunk;
-          });
-          response.on('end', function() {
-            fs.writeFile(paths.archivedSites + '/' + url, data, 'utf8', function(err) {
-              if (err) {
-                console.log(err);
-                throw err;
-              } else {
-                console.log('Successfully saved file');
-              }
+    isUrlArchived(url)
+      .then(function(exists) {
+        if (!exists) {
+          http.get('http://' + url, function(response) {
+            var data = '';
+            response.on('data', function(chunk) {
+              data += chunk;
             });
-          });
-        })
-        .on('error', function(err) {
-          console.log('Could not save url ' + url, err);
-        });
-        
-      }
-    });
+            response.on('end', function() {
+              fs.writeFile(paths.archivedSites + '/' + url, data, 'utf8', function(err) {
+                if (err) {
+                  console.log(err);
+                  throw err;
+                } else {
+                  console.log('Successfully saved file');
+                }
+              });
+            });
+          })
+          .on('error', function(err) {
+            console.log('Could not save url ' + url, err);
+          }); 
+        }
+      });
   });
 };

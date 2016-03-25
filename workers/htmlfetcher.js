@@ -8,4 +8,10 @@
 
 var archive = require('../helpers/archive-helpers.js');
 
-archive.readListOfUrls(archive.downloadUrls);
+archive.readListOfUrls()
+  .then(function(urls) {
+    archive.downloadUrls(urls);
+  })
+  .catch(function(err) {
+    console.log('Could not read list of URLs', err);
+  });

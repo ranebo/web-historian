@@ -7,12 +7,13 @@ var _ = require('underscore');
 // require more modules/folders here!
 
 exports.handleRequest = function (req, res) {
-  if (req.method === 'GET') {
+  if (req.method === 'GET' && req.url !== '/sites') {
     if (req.url === '/') {
       var url = path.join(archive.paths.siteAssets, '/index.html');
     } else {
-      var url = path.join(__dirname, '../test/testdata/sites', req.url);
+      var url = path.join(archive.paths.siteAssets, '/', req.url);
     }
+    console.log(url);
     fs.exists(url, function(exists) {
       if (exists) {
         httpHelpers.readAssetsAsync(url)
@@ -34,43 +35,56 @@ exports.handleRequest = function (req, res) {
       queryData += chunk;
     });
     req.on('end', function() {
+      console.log('POST', queryData);
       queryDataUrl = queryData.slice(4);
       if (queryData.slice(0, 3) === 'url') {
-        archive.isUrlInList(queryDataUrl, function(exists) {
-          if (!exists) {
-            archive.addUrlToList(queryDataUrl, _.identity);
-            fs.readFile(loadingPath, 'utf8', function(err, data) {
-              if (err) {
-                console.log('Could not load loading.html', err);
-              } else {
-                res.writeHead(302);
-                res.end(data);
-              }
-            });
-          } else {
-            var archivePath = path.join(archive.paths.archivedSites, queryDataUrl);
-            fs.readFile(archivePath, 'utf8', function(err, data) {
-              if (err) {
-                fs.readFile(loadingPath, 'utf8', function(err, data) {
-                  if (err) {
-                    console.log('Could not load loading.html', err);
-                  } else {
-                    res.writeHead(302);
-                    res.end(data);
-                  }
+        archive.isUrlInList(queryDataUrl)
+          .then(function(exists) {
+            if (!exists) {
+              archive.addUrlToList(queryDataUrl)
+                .catch(function(err) {
+                  console.log('Could not write to url list', err);
                 });
-              } else {
-                res.writeHead(302);
-                res.end(data);
-              }
-            });
-          }
-        });
+              fs.readFile(loadingPath, 'utf8', function(err, data) {
+                if (err) {
+                  console.log('Could not load loading.html', err);
+                } else {
+                  res.writeHead(201);
+                  res.end(data);
+                }
+              });
+            } else {
+              var archivePath = path.join(archive.paths.archivedSites, queryDataUrl);
+              fs.readFile(archivePath, 'utf8', function(err, data) {
+                if (err) {
+                  fs.readFile(loadingPath, 'utf8', function(err, data) {
+                    if (err) {
+                      console.log('Could not load loading.html', err);
+                    } else {
+                      res.writeHead(201);
+                      res.end(data);
+                    }
+                  });
+                } else {
+                  res.writeHead(201);
+                  res.end(data);
+                }
+              });
+            }
+          });
       } else {
         res.writeHead(404);
         res.end();
       }
     });
+  } else if (req.method === 'GET' && req.url === '/sites') {
+    readListOfUrls()
+      .then(function(urls) {
+        httpHelpers.serveAssets(res, JSON.stringify(urls));
+      })
+      .catch(function(err) {
+        console.log('Could not read list of urls', err);
+      });
   }
 
   // res.end(archive.paths.list);
